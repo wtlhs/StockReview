@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = '20260401-8';
+const VERSION = '20260401-9';
 const CACHE_NAME = 'inventory-' + VERSION;
 const ASSETS = [
   '/',

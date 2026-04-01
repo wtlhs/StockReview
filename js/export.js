@@ -41,6 +41,38 @@ const ExportUtils = {
     ];
 
     XLSX.utils.book_append_sheet(wb, ws, '盘点记录');
-    XLSX.writeFile(wb, filename);
+
+    // 生成二进制数据
+    var wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    var blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+
+    // PWA 独立模式：优先使用 Web Share API（唤起系统分享面板，可保存到文件）
+    var file = new File([blob], filename, { type: blob.type });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({
+        files: [file],
+        title: filename
+      }).then(function() {
+        App.showToast('导出成功');
+      }).catch(function(err) {
+        if (err.name === 'AbortError') return;
+        ExportUtils._fallbackDownload(blob, filename);
+      });
+      return;
+    }
+
+    // 回退：传统下载
+    ExportUtils._fallbackDownload(blob, filename);
+  },
+
+  _fallbackDownload(blob, filename) {
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
   }
 };
