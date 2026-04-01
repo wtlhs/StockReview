@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = '20260401';
+const VERSION = '20260401-8';
 const CACHE_NAME = 'inventory-' + VERSION;
 const ASSETS = [
   '/',
@@ -11,7 +11,7 @@ const ASSETS = [
   '/js/scanner.js',
   '/js/export.js',
   '/js/app.js',
-  '/libs/html5-qrcode.min.js',
+  '/libs/jsQR.js',
   '/libs/xlsx.full.min.js',
   '/manifest.json',
   '/icons/icon-192.png',

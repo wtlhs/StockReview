@@ -174,6 +174,10 @@ const App = {
   },
 
   _renderScanForm(parsed) {
+    // 收起摄像头区域，腾出表单空间
+    var scannerContainer = document.getElementById('scanner-container');
+    if (scannerContainer) scannerContainer.classList.add('collapsed');
+
     const area = document.getElementById('scan-result-area');
     area.innerHTML = this._buildScanInfoHtml(parsed) +
       '<form id="scan-form">' +
@@ -191,7 +195,10 @@ const App = {
       e.preventDefault();
       this._saveScanRecord(parsed);
     });
-    document.getElementById('scan-shelf').focus();
+    var shelfInput = document.getElementById('scan-shelf');
+    shelfInput.focus();
+    // iOS 键盘弹出后确保输入框可见
+    setTimeout(function() { shelfInput.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 300);
   },
 
   async _saveScanRecord(parsed) {
@@ -394,20 +401,29 @@ const App = {
   _registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
 
+    // 刷新后检查是否刚完成更新
+    if (sessionStorage.getItem('sw-updated') === 'true') {
+      sessionStorage.removeItem('sw-updated');
+      setTimeout(() => this.showToast('应用已更新'), 500);
+    }
+
     navigator.serviceWorker.register('sw.js').then((reg) => {
-      // 检测到新版本安装完成
+      // 主动检查更新（避免浏览器缓存 SW 不检查）
+      reg.update();
+
       reg.addEventListener('updatefound', () => {
         const newWorker = reg.installing;
         newWorker.addEventListener('statechange', () => {
           if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            this.showToast('新版本已就绪，刷新页面即可更新');
+            this.showToast('发现新版本，正在更新...');
           }
         });
       });
     }).catch(() => {});
 
-    // 新 SW 接管后自动刷新
+    // 新 SW 接管后标记并刷新
     navigator.serviceWorker.addEventListener('controllerchange', () => {
+      sessionStorage.setItem('sw-updated', 'true');
       window.location.reload();
     });
   },
