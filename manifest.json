@@ -1,6 +1,6 @@
 {
   "name": "库存盘点",
-  "short_name": "盘点",
+  "short_name": "库存盘点",
   "description": "离线库存盘点工具，支持二维码扫描和数据导出",
   "start_url": "/index.html",
   "display": "standalone",

@@ -96,6 +96,19 @@
     </div>
   </div>
 
+  <!-- ====== Modal: Duplicate Scan ====== -->
+  <div class="modal-overlay" id="modal-duplicate">
+    <div class="modal">
+      <h3>重复扫码</h3>
+      <p id="duplicate-message" style="color:var(--text-secondary);font-size:14px;"></p>
+      <div class="modal-actions" style="flex-direction:column;gap:8px;">
+        <button class="btn btn-primary btn-block" id="btn-dup-overwrite">覆盖已有记录</button>
+        <button class="btn btn-secondary btn-block" id="btn-dup-new">新建一条记录</button>
+        <button class="btn btn-secondary btn-block" id="btn-dup-cancel">取消</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ====== Modal: Confirm Delete ====== -->
   <div class="modal-overlay" id="modal-confirm-delete">
     <div class="modal">

@@ -147,7 +147,33 @@ const App = {
     '</div></div>';
   },
 
-  _showScanForm(parsed) {
+  /* ===== Duplicate Check ===== */
+  _pendingDuplicate: null,
+  _existingDuplicateRecord: null,
+
+  async _checkDuplicate(palletNumber) {
+    const records = await DB.getRecordsBySession(this.currentSessionId);
+    return records.find((r) => r.palletNumber === palletNumber) || null;
+  },
+
+  async _showScanForm(parsed) {
+    // 检查同一会话中是否已有相同托盘号
+    const existing = await this._checkDuplicate(parsed.palletNumber);
+    if (existing) {
+      this._pendingDuplicate = parsed;
+      this._existingDuplicateRecord = existing;
+      document.getElementById('duplicate-message').textContent =
+        '托盘号「' + parsed.palletNumber + '」已有盘点记录（零件: ' + existing.partNumber +
+        '，实际数量: ' + (existing.actualQuantity != null ? existing.actualQuantity : '—') +
+        '），请选择操作：';
+      document.getElementById('modal-duplicate').classList.add('active');
+      return;
+    }
+
+    this._renderScanForm(parsed);
+  },
+
+  _renderScanForm(parsed) {
     const area = document.getElementById('scan-result-area');
     area.innerHTML = this._buildScanInfoHtml(parsed) +
       '<form id="scan-form">' +
@@ -194,6 +220,11 @@ const App = {
     };
 
     try {
+      // 如果是覆盖模式，先删除旧记录
+      if (this._existingDuplicateRecord) {
+        await DB.deleteRecord(this._existingDuplicateRecord.id);
+        this._existingDuplicateRecord = null;
+      }
       await DB.createRecord(record);
       this.pendingScanData = null;
       document.getElementById('scan-result-area').innerHTML = '';
@@ -359,14 +390,32 @@ const App = {
     await this._doExport(allRecords, '全部盘点_' + timestamp + '.xlsx');
   },
 
+  /* ===== SW Update ===== */
+  _registerServiceWorker() {
+    if (!('serviceWorker' in navigator)) return;
+
+    navigator.serviceWorker.register('sw.js').then((reg) => {
+      // 检测到新版本安装完成
+      reg.addEventListener('updatefound', () => {
+        const newWorker = reg.installing;
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            this.showToast('新版本已就绪，刷新页面即可更新');
+          }
+        });
+      });
+    }).catch(() => {});
+
+    // 新 SW 接管后自动刷新
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      window.location.reload();
+    });
+  },
+
   /* ===== Init ===== */
   async init() {
     await DB.open();
-
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js').catch(() => {});
-    }
-
+    this._registerServiceWorker();
     this.refreshSessionList();
     this._bindEvents();
   },
@@ -452,6 +501,35 @@ const App = {
     document.querySelectorAll('.modal-overlay').forEach((overlay) => {
       overlay.addEventListener('click', (e) => {
         if (e.target === overlay) overlay.classList.remove('active');
+      });
+    });
+
+    // 重复扫码 - 覆盖已有记录
+    document.getElementById('btn-dup-overwrite').addEventListener('click', () => {
+      document.getElementById('modal-duplicate').classList.remove('active');
+      const parsed = this._pendingDuplicate;
+      this._pendingDuplicate = null;
+      this._renderScanForm(parsed);
+    });
+
+    // 重复扫码 - 新建记录
+    document.getElementById('btn-dup-new').addEventListener('click', () => {
+      document.getElementById('modal-duplicate').classList.remove('active');
+      const parsed = this._pendingDuplicate;
+      this._pendingDuplicate = null;
+      this._existingDuplicateRecord = null;
+      this._renderScanForm(parsed);
+    });
+
+    // 重复扫码 - 取消
+    document.getElementById('btn-dup-cancel').addEventListener('click', () => {
+      document.getElementById('modal-duplicate').classList.remove('active');
+      this._pendingDuplicate = null;
+      this._existingDuplicateRecord = null;
+      document.getElementById('scan-result-area').innerHTML = '';
+      Scanner.start('scanner-container', (parsed) => {
+        this.pendingScanData = parsed;
+        this._showScanForm(parsed);
       });
     });
 

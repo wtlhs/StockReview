@@ -1,6 +1,7 @@
 'use strict';
 
-const CACHE_NAME = 'inventory-v1';
+const VERSION = '20260401';
+const CACHE_NAME = 'inventory-' + VERSION;
 const ASSETS = [
   '/',
   '/index.html',
@@ -34,10 +35,24 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // 仅缓存同源请求和已知本地资源
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
 
+  // 导航请求（HTML）用 network-first，确保始终加载最新页面
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          return response;
+        })
+        .catch(() => caches.match('/index.html'))
+    );
+    return;
+  }
+
+  // 静态资源用 cache-first
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached;
@@ -47,10 +62,6 @@ self.addEventListener('fetch', (event) => {
         caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
         return response;
       });
-    }).catch(() => {
-      if (event.request.destination === 'document') {
-        return caches.match('/index.html');
-      }
     })
   );
 });
