@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#16213e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>库存盘点</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app">
+
+    <!-- ====== Page: Home ====== -->
+    <div id="page-home" class="page active">
+      <div class="header">
+        <h1>库存盘点</h1>
+        <button class="btn btn-sm btn-secondary" id="btn-export-all" title="导出全部">&#128196; 导出全部</button>
+      </div>
+      <div id="session-list" style="margin-top:8px;"></div>
+      <button class="btn btn-primary btn-block" id="btn-new-session" style="margin-top:12px;">
+        + 新建盘点
+      </button>
+    </div>
+
+    <!-- ====== Page: Session Detail ====== -->
+    <div id="page-session" class="page">
+      <div class="header">
+        <button class="btn-back" id="btn-back-home">&#8592;</button>
+        <h1 id="session-title">盘点详情</h1>
+        <button class="btn btn-sm btn-secondary" id="btn-export-session">&#128196; 导出</button>
+      </div>
+      <div class="records-header">
+        <h2>扫码记录</h2>
+        <span id="record-count" style="font-size:13px;color:var(--text-secondary);"></span>
+      </div>
+      <div id="record-list"></div>
+      <button class="btn btn-primary btn-block" id="btn-start-scan" style="margin-top:16px;">
+        &#128247; 开始扫码
+      </button>
+    </div>
+
+    <!-- ====== Page: Scanner ====== -->
+    <div id="page-scanner" class="page">
+      <div class="header">
+        <button class="btn-back" id="btn-back-session">&#8592;</button>
+        <h1>扫码盘点</h1>
+      </div>
+      <div id="scanner-container"></div>
+      <div id="scan-result-area"></div>
+      <div id="recent-scans"></div>
+    </div>
+
+    <!-- ====== Page: Edit Record ====== -->
+    <div id="page-edit" class="page">
+      <div class="header">
+        <button class="btn-back" id="btn-back-from-edit">&#8592;</button>
+        <h1>编辑记录</h1>
+      </div>
+      <div id="edit-scan-info" style="margin-bottom:16px;"></div>
+      <form id="edit-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="edit-shelf">货架号</label>
+            <input type="text" id="edit-shelf" placeholder="如 A-03" autocomplete="off">
+          </div>
+          <div class="form-group">
+            <label for="edit-quantity">实际数量</label>
+            <input type="number" id="edit-quantity" placeholder="输入数量" inputmode="numeric">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="edit-notes">备注</label>
+          <textarea id="edit-notes" placeholder="选填备注信息"></textarea>
+        </div>
+        <button type="submit" class="btn btn-success btn-block">保存</button>
+      </form>
+    </div>
+
+  </div>
+
+  <!-- ====== Modal: New Session ====== -->
+  <div class="modal-overlay" id="modal-new-session">
+    <div class="modal">
+      <h3>新建盘点会话</h3>
+      <div class="form-group">
+        <label for="input-session-name">会话名称</label>
+        <input type="text" id="input-session-name" placeholder="如 2024-03-31 A区盘点" autocomplete="off">
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="btn-cancel-session">取消</button>
+        <button class="btn btn-primary" id="btn-create-session">创建</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== Modal: Confirm Delete ====== -->
+  <div class="modal-overlay" id="modal-confirm-delete">
+    <div class="modal">
+      <h3>确认删除</h3>
+      <p id="delete-message" style="color:var(--text-secondary);font-size:14px;"></p>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="btn-cancel-delete">取消</button>
+        <button class="btn btn-danger" id="btn-confirm-delete">删除</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== Toast ====== -->
+  <div class="toast" id="toast"></div>
+
+  <!-- ====== Scripts ====== -->
+  <script src="libs/html5-qrcode.min.js"></script>
+  <script src="libs/xlsx.full.min.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/scanner.js"></script>
+  <script src="js/export.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
