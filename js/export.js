@@ -7,7 +7,7 @@ const ExportUtils = {
    * @param {string} filename - 导出文件名
    */
   toExcel(records, filename) {
-    const header = ['序号', '托盘号', '零件号', '批次号', '标签数量', '实际数量', '货架号', '备注', '扫码时间', '所属会话'];
+    const header = ['序号', '托盘号', '零件号', '批次号', '标签数量', '实际数量', '货架号', '发票号', '备注', '扫码时间', '所属会话'];
 
     const rows = records.map((r, i) => [
       i + 1,
@@ -17,6 +17,7 @@ const ExportUtils = {
       r.qrQuantity,
       r.actualQuantity ?? '',
       r.shelfNumber,
+      r.invoiceNumber || '',
       r.notes,
       Utils.formatDate(r.scannedAt),
       r._sessionName || ''
@@ -35,6 +36,7 @@ const ExportUtils = {
       { wch: 10 },  // 标签数量
       { wch: 10 },  // 实际数量
       { wch: 10 },  // 货架号
+      { wch: 16 },  // 发票号
       { wch: 20 },  // 备注
       { wch: 18 },  // 扫码时间
       { wch: 20 }   // 所属会话

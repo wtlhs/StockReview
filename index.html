@@ -17,7 +17,10 @@
     <div id="page-home" class="page active">
       <div class="header">
         <h1>库存盘点</h1>
-        <button class="btn btn-sm btn-secondary" id="btn-export-all" title="导出全部">&#128196; 导出全部</button>
+        <div class="header-actions">
+          <button class="btn btn-sm btn-secondary" id="btn-refresh" title="刷新页面" onclick="App._doRefresh()">&#128260; 刷新</button>
+          <button class="btn btn-sm btn-secondary" id="btn-export-all" title="导出全部">&#128196; 导出</button>
+        </div>
       </div>
       <div id="session-list" style="margin-top:8px;"></div>
       <button class="btn btn-primary btn-block" id="btn-new-session" style="margin-top:12px;">
@@ -64,11 +67,21 @@
         <div class="form-row">
           <div class="form-group">
             <label for="edit-shelf">货架号</label>
-            <input type="text" id="edit-shelf" placeholder="如 A-03" autocomplete="off">
+            <input type="text" id="edit-shelf" placeholder="选填，如 A-03" autocomplete="off">
           </div>
           <div class="form-group">
             <label for="edit-quantity">实际数量</label>
             <input type="number" id="edit-quantity" placeholder="输入数量" inputmode="numeric">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="edit-batch">批次号</label>
+            <input type="text" id="edit-batch" placeholder="批次号" autocomplete="off">
+          </div>
+          <div class="form-group">
+            <label for="edit-invoice">发票号</label>
+            <input type="text" id="edit-invoice" placeholder="选填发票号" autocomplete="off">
           </div>
         </div>
         <div class="form-group">

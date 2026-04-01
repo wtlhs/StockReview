@@ -100,6 +100,7 @@ const App = {
             '标签:' + Utils.esc(r.qrQuantity) + ' &nbsp; ' +
             '实际:<strong>' + (r.actualQuantity != null ? r.actualQuantity : '—') + '</strong> &nbsp; ' +
             '货架:<strong>' + Utils.esc(r.shelfNumber || '—') + '</strong>' +
+            (r.invoiceNumber ? ' &nbsp;发票:' + Utils.esc(r.invoiceNumber) : '') +
             (r.notes ? ' &nbsp;备注:' + Utils.esc(r.notes) : '') +
           '</div>' +
         '</div>' +
@@ -182,8 +183,12 @@ const App = {
     area.innerHTML = this._buildScanInfoHtml(parsed) +
       '<form id="scan-form">' +
         '<div class="form-row">' +
-          '<div class="form-group"><label for="scan-shelf">货架号</label><input type="text" id="scan-shelf" placeholder="如 A-03" autocomplete="off" autofocus></div>' +
+          '<div class="form-group"><label for="scan-shelf">货架号</label><input type="text" id="scan-shelf" placeholder="选填，如 A-03" autocomplete="off" autofocus></div>' +
           '<div class="form-group"><label for="scan-quantity">实际数量</label><input type="number" id="scan-quantity" placeholder="输入数量" inputmode="numeric" value="' + Utils.esc(parsed.qrQuantity) + '"></div>' +
+        '</div>' +
+        '<div class="form-row">' +
+          '<div class="form-group"><label for="scan-batch">批次号</label><input type="text" id="scan-batch" placeholder="批次号" autocomplete="off" value="' + Utils.esc(parsed.batchNumber) + '"></div>' +
+          '<div class="form-group"><label for="scan-invoice">发票号</label><input type="text" id="scan-invoice" placeholder="选填发票号" autocomplete="off"></div>' +
         '</div>' +
         '<div class="form-group"><label for="scan-notes">备注</label><textarea id="scan-notes" placeholder="选填备注信息"></textarea></div>' +
         '<button type="submit" class="btn btn-success btn-block">&#10004; 确认保存</button>' +
@@ -204,12 +209,9 @@ const App = {
   async _saveScanRecord(parsed) {
     const shelf = document.getElementById('scan-shelf').value.trim();
     const actualQtyStr = document.getElementById('scan-quantity').value.trim();
+    const batchNumber = document.getElementById('scan-batch').value.trim();
+    const invoiceNumber = document.getElementById('scan-invoice').value.trim();
     const notes = document.getElementById('scan-notes').value.trim();
-
-    if (!shelf) {
-      this.showToast('请输入货架号', true);
-      return;
-    }
 
     const actualQuantity = Utils.parsePositiveInt(actualQtyStr);
 
@@ -218,10 +220,11 @@ const App = {
       sessionId: this.currentSessionId,
       qrQuantity: parsed.qrQuantity,
       partNumber: parsed.partNumber,
-      batchNumber: parsed.batchNumber,
+      batchNumber: batchNumber,
       palletNumber: parsed.palletNumber,
       shelfNumber: shelf,
       actualQuantity,
+      invoiceNumber,
       notes,
       scannedAt: Utils.nowISO()
     };
@@ -270,7 +273,9 @@ const App = {
         '<div class="record-card">' +
           '<div class="record-body">' +
             '<div class="record-title">' + Utils.esc(r.palletNumber) + '</div>' +
-            '<div class="record-subtitle">' + Utils.esc(r.partNumber) + ' &nbsp;|&nbsp; 货架: ' + Utils.esc(r.shelfNumber) + ' &nbsp;|&nbsp; 实际: ' + (r.actualQuantity != null ? r.actualQuantity : '—') + '</div>' +
+            '<div class="record-subtitle">' + Utils.esc(r.partNumber) + ' &nbsp;|&nbsp; 货架: ' + Utils.esc(r.shelfNumber || '—') + ' &nbsp;|&nbsp; 实际: ' + (r.actualQuantity != null ? r.actualQuantity : '—') +
+              (r.invoiceNumber ? ' &nbsp;|&nbsp; 发票: ' + Utils.esc(r.invoiceNumber) : '') +
+            '</div>' +
           '</div>' +
         '</div>'
       ).join('');
@@ -286,6 +291,8 @@ const App = {
 
     document.getElementById('edit-shelf').value = record.shelfNumber || '';
     document.getElementById('edit-quantity').value = record.actualQuantity != null ? record.actualQuantity : '';
+    document.getElementById('edit-batch').value = record.batchNumber || '';
+    document.getElementById('edit-invoice').value = record.invoiceNumber || '';
     document.getElementById('edit-notes').value = record.notes || '';
     this.showPage('page-edit');
     document.getElementById('edit-shelf').focus();
@@ -297,18 +304,17 @@ const App = {
 
     const shelf = document.getElementById('edit-shelf').value.trim();
     const actualQtyStr = document.getElementById('edit-quantity').value.trim();
+    const batchNumber = document.getElementById('edit-batch').value.trim();
+    const invoiceNumber = document.getElementById('edit-invoice').value.trim();
     const notes = document.getElementById('edit-notes').value.trim();
-
-    if (!shelf) {
-      this.showToast('请输入货架号', true);
-      return;
-    }
 
     const actualQuantity = Utils.parsePositiveInt(actualQtyStr);
 
     const updated = Object.assign({}, record, {
       shelfNumber: shelf,
       actualQuantity,
+      batchNumber,
+      invoiceNumber,
       notes
     });
 
@@ -426,6 +432,31 @@ const App = {
       sessionStorage.setItem('sw-updated', 'true');
       window.location.reload();
     });
+  },
+
+  /* ===== Refresh ===== */
+  _doRefresh() {
+    this.showToast('正在刷新...');
+    var url = window.location.origin + window.location.pathname + '?_t=' + Date.now();
+    setTimeout(function() {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistration().then(function(reg) {
+          return reg ? reg.unregister() : Promise.resolve();
+        }).then(function() {
+          if ('caches' in window) {
+            return caches.keys().then(function(names) {
+              return Promise.all(names.map(function(n) { return caches.delete(n); }));
+            });
+          }
+        }).then(function() {
+          window.location.href = url;
+        }).catch(function() {
+          window.location.href = url;
+        });
+      } else {
+        window.location.href = url;
+      }
+    }, 300);
   },
 
   /* ===== Init ===== */
