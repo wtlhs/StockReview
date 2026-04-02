@@ -2,6 +2,7 @@
 
 /* ===== App State ===== */
 const App = {
+  VERSION: '20260402-03',
   currentSessionId: null,
   currentPage: 'home',
   pendingScanData: null,
@@ -467,6 +468,8 @@ const App = {
 
   /* ===== Init ===== */
   async init() {
+    // 注入页脚版本号
+    document.getElementById('footer-version').textContent = 'v' + this.VERSION;
     await DB.open();
     this._registerServiceWorker();
     this.refreshSessionList();
