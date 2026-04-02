@@ -2,7 +2,7 @@
 
 /* ===== App State ===== */
 const App = {
-  VERSION: '20260402-03',
+  VERSION: '20260402-04',
   currentSessionId: null,
   currentPage: 'home',
   pendingScanData: null,

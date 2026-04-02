@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = '20260402-03';
+const VERSION = '20260402-04';
 const CACHE_NAME = 'inventory-' + VERSION;
 const ASSETS = [
   '/',
@@ -52,16 +52,16 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 静态资源用 cache-first
+  // 静态资源用 stale-while-revalidate：优先返回缓存，后台更新缓存
   event.respondWith(
     caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(event.request).then((response) => {
+      const fetchPromise = fetch(event.request).then((response) => {
         if (!response || response.status !== 200) return response;
         const clone = response.clone();
         caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
         return response;
-      });
+      }).catch(() => cached);
+      return cached || fetchPromise;
     })
   );
 });
