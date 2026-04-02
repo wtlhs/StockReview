@@ -153,18 +153,24 @@ const App = {
   _existingDuplicateRecord: null,
 
   async _checkDuplicate(palletNumber) {
-    const records = await DB.getRecordsBySession(this.currentSessionId);
-    return records.find((r) => r.palletNumber === palletNumber) || null;
+    return await DB.findRecordByPallet(palletNumber);
   },
 
   async _showScanForm(parsed) {
-    // 检查同一会话中是否已有相同托盘号
+    // 检查全局是否已有相同托盘号
     const existing = await this._checkDuplicate(parsed.palletNumber);
     if (existing) {
       this._pendingDuplicate = parsed;
       this._existingDuplicateRecord = existing;
+      const sameSession = existing.sessionId === this.currentSessionId;
+      let sessionHint = '';
+      if (!sameSession) {
+        const session = await DB.getSession(existing.sessionId);
+        sessionHint = '（会话: ' + (session ? session.name : existing.sessionId) + '）';
+      }
       document.getElementById('duplicate-message').textContent =
-        '托盘号「' + parsed.palletNumber + '」已有盘点记录（零件: ' + existing.partNumber +
+        '托盘号「' + parsed.palletNumber + '」已有盘点记录' + sessionHint +
+        '（零件: ' + existing.partNumber +
         '，实际数量: ' + (existing.actualQuantity != null ? existing.actualQuantity : '—') +
         '），请选择操作：';
       document.getElementById('modal-duplicate').classList.add('active');

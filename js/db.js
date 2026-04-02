@@ -161,6 +161,20 @@ const DB = {
     });
   },
 
+  async findRecordByPallet(palletNumber) {
+    await this.open();
+    return new Promise((resolve, reject) => {
+      const tx = this._db.transaction('records');
+      const store = tx.objectStore('records');
+      const request = store.getAll();
+      request.onsuccess = () => {
+        const record = request.result.find((r) => r.palletNumber === palletNumber) || null;
+        resolve(record);
+      };
+      tx.onerror = (e) => reject(e.target.error);
+    });
+  },
+
   async getRecord(id) {
     await this.open();
     return new Promise((resolve, reject) => {
