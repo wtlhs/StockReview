@@ -43,6 +43,9 @@
       <button class="btn btn-primary btn-block" id="btn-start-scan" style="margin-top:16px;">
         &#128247; 开始扫码
       </button>
+      <button class="btn btn-secondary btn-block" id="btn-manual-entry" style="margin-top:8px;">
+        &#9997; 手动录入
+      </button>
     </div>
 
     <!-- ====== Page: Scanner ====== -->
@@ -64,6 +67,16 @@
       </div>
       <div id="edit-scan-info" style="margin-bottom:16px;"></div>
       <form id="edit-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="edit-pallet">托盘号</label>
+            <input type="text" id="edit-pallet" placeholder="托盘号" autocomplete="off">
+          </div>
+          <div class="form-group">
+            <label for="edit-part">零件号</label>
+            <input type="text" id="edit-part" placeholder="零件号" autocomplete="off">
+          </div>
+        </div>
         <div class="form-row">
           <div class="form-group">
             <label for="edit-shelf">货架号</label>

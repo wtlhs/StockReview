@@ -2,7 +2,7 @@
 
 /* ===== App State ===== */
 const App = {
-  VERSION: '20260402-04',
+  VERSION: '20260403-02',
   currentSessionId: null,
   currentPage: 'home',
   pendingScanData: null,
@@ -130,6 +130,8 @@ const App = {
   /* ===== Scanner Page ===== */
   async openScanner() {
     this.showPage('page-scanner');
+    document.querySelector('#page-scanner .header h1').textContent = '扫码盘点';
+    document.getElementById('scanner-container').classList.remove('collapsed');
     this.pendingScanData = null;
     document.getElementById('scan-result-area').innerHTML = '';
     document.getElementById('recent-scans').innerHTML = '';
@@ -288,6 +290,117 @@ const App = {
       ).join('');
   },
 
+  /* ===== Manual Entry ===== */
+  _openManualEntry() {
+    Scanner.stop();
+    this.showPage('page-scanner');
+    this.pendingScanData = null;
+    const scannerContainer = document.getElementById('scanner-container');
+    scannerContainer.classList.add('collapsed');
+    document.getElementById('recent-scans').innerHTML = '';
+    document.querySelector('#page-scanner .header h1').textContent = '手动录入';
+
+    const area = document.getElementById('scan-result-area');
+    area.innerHTML =
+      '<form id="scan-form">' +
+        '<div class="form-group"><label for="scan-pallet">托盘号 *</label><input type="text" id="scan-pallet" placeholder="输入托盘号" autocomplete="off" autofocus></div>' +
+        '<div class="form-row">' +
+          '<div class="form-group"><label for="scan-part">零件号</label><input type="text" id="scan-part" placeholder="零件号" autocomplete="off"></div>' +
+          '<div class="form-group"><label for="scan-qr-qty">标签数量</label><input type="number" id="scan-qr-qty" placeholder="标签数量" inputmode="numeric"></div>' +
+        '</div>' +
+        '<div class="form-row">' +
+          '<div class="form-group"><label for="scan-shelf">货架号</label><input type="text" id="scan-shelf" placeholder="选填，如 A-03" autocomplete="off"></div>' +
+          '<div class="form-group"><label for="scan-quantity">实际数量</label><input type="number" id="scan-quantity" placeholder="输入数量" inputmode="numeric"></div>' +
+        '</div>' +
+        '<div class="form-row">' +
+          '<div class="form-group"><label for="scan-batch">批次号</label><input type="text" id="scan-batch" placeholder="批次号" autocomplete="off"></div>' +
+          '<div class="form-group"><label for="scan-invoice">发票号</label><input type="text" id="scan-invoice" placeholder="选填发票号" autocomplete="off"></div>' +
+        '</div>' +
+        '<div class="form-group"><label for="scan-notes">备注</label><textarea id="scan-notes" placeholder="选填备注信息"></textarea></div>' +
+        '<button type="submit" class="btn btn-success btn-block">&#10004; 确认保存</button>' +
+        '<button type="button" class="btn btn-secondary btn-block" id="btn-scan-cancel" style="margin-top:8px;">取消</button>' +
+      '</form>';
+
+    document.getElementById('btn-scan-cancel').addEventListener('click', () => {
+      area.innerHTML = '';
+      this.showPage('page-session');
+      this.refreshRecordList();
+    });
+
+    document.getElementById('scan-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      this._saveManualRecord();
+    });
+
+    const palletInput = document.getElementById('scan-pallet');
+    palletInput.focus();
+    palletInput.addEventListener('blur', () => {
+      const val = palletInput.value.trim();
+      if (!val) return;
+      DB.findRecordByPallet(val).then((existing) => {
+        if (!existing) return;
+        const hint = existing.sessionId === this.currentSessionId ? '' : '（其他会话中已有）';
+        this.showToast('托盘号「' + val + '」已存在' + hint, true);
+      });
+    });
+    setTimeout(() => { palletInput.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 300);
+  },
+
+  async _saveManualRecord() {
+    const palletNumber = document.getElementById('scan-pallet').value.trim();
+    const partNumber = document.getElementById('scan-part').value.trim();
+    const qrQtyStr = document.getElementById('scan-qr-qty').value.trim();
+    const shelf = document.getElementById('scan-shelf').value.trim();
+    const actualQtyStr = document.getElementById('scan-quantity').value.trim();
+    const batchNumber = document.getElementById('scan-batch').value.trim();
+    const invoiceNumber = document.getElementById('scan-invoice').value.trim();
+    const notes = document.getElementById('scan-notes').value.trim();
+
+    if (!palletNumber) {
+      this.showToast('托盘号不能为空', true);
+      return;
+    }
+
+    const existing = await this._checkDuplicate(palletNumber);
+    if (existing) {
+      const sameSession = existing.sessionId === this.currentSessionId;
+      let sessionHint = '';
+      if (!sameSession) {
+        const session = await DB.getSession(existing.sessionId);
+        sessionHint = '（会话: ' + (session ? session.name : existing.sessionId) + '）';
+      }
+      this.showToast('托盘号「' + palletNumber + '」已存在' + sessionHint + '，请修改后重试', true);
+      return;
+    }
+
+    const actualQuantity = Utils.parsePositiveInt(actualQtyStr);
+    const qrQuantity = Utils.parsePositiveInt(qrQtyStr);
+
+    const record = {
+      id: Utils.generateId(),
+      sessionId: this.currentSessionId,
+      qrQuantity: qrQuantity != null ? String(qrQuantity) : '',
+      partNumber: partNumber,
+      batchNumber: batchNumber,
+      palletNumber: palletNumber,
+      shelfNumber: shelf,
+      actualQuantity: actualQuantity,
+      invoiceNumber: invoiceNumber,
+      notes: notes,
+      scannedAt: Utils.nowISO()
+    };
+
+    try {
+      await DB.createRecord(record);
+      document.getElementById('scan-result-area').innerHTML = '';
+      this.showToast('保存成功');
+      this.showPage('page-session');
+      await this.refreshRecordList();
+    } catch (err) {
+      this.showToast('保存失败', true);
+    }
+  },
+
   /* ===== Edit Record ===== */
   async _editRecord(recordId) {
     const record = await DB.getRecord(recordId);
@@ -296,6 +409,8 @@ const App = {
 
     document.getElementById('edit-scan-info').innerHTML = this._buildScanInfoHtml(record);
 
+    document.getElementById('edit-pallet').value = record.palletNumber || '';
+    document.getElementById('edit-part').value = record.partNumber || '';
     document.getElementById('edit-shelf').value = record.shelfNumber || '';
     document.getElementById('edit-quantity').value = record.actualQuantity != null ? record.actualQuantity : '';
     document.getElementById('edit-batch').value = record.batchNumber || '';
@@ -314,10 +429,30 @@ const App = {
     const batchNumber = document.getElementById('edit-batch').value.trim();
     const invoiceNumber = document.getElementById('edit-invoice').value.trim();
     const notes = document.getElementById('edit-notes').value.trim();
+    const palletNumber = document.getElementById('edit-pallet').value.trim();
+    const partNumber = document.getElementById('edit-part').value.trim();
+
+    if (!palletNumber) {
+      this.showToast('托盘号不能为空', true);
+      return;
+    }
+
+    // 托盘号变更时检查重复
+    if (palletNumber !== record.palletNumber) {
+      const existing = await this._checkDuplicate(palletNumber);
+      if (existing) {
+        const session = await DB.getSession(existing.sessionId);
+        const sessionName = session ? session.name : existing.sessionId;
+        this.showToast('托盘号「' + palletNumber + '」已存在（会话: ' + sessionName + '）', true);
+        return;
+      }
+    }
 
     const actualQuantity = Utils.parsePositiveInt(actualQtyStr);
 
     const updated = Object.assign({}, record, {
+      palletNumber,
+      partNumber,
       shelfNumber: shelf,
       actualQuantity,
       batchNumber,
@@ -551,6 +686,11 @@ const App = {
     // 会话详情页的扫码按钮
     document.getElementById('btn-start-scan').addEventListener('click', () => {
       this.openScanner();
+    });
+
+    // 手动录入按钮
+    document.getElementById('btn-manual-entry').addEventListener('click', () => {
+      this._openManualEntry();
     });
 
     // 点击模态框背景关闭
