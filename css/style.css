@@ -674,3 +674,192 @@ html, body {
     font-size: 12px;
   }
 }
+
+/* ========== Module Cards (Home) ========== */
+.module-card {
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  margin-bottom: 20px;
+  flex-shrink: 0;
+}
+
+/* 首页 header 与第一个模块之间留出间距 */
+#page-home > .module-card:first-of-type {
+  margin-top: 16px;
+}
+
+.module-stock {
+  border-color: var(--accent);
+}
+
+.module-outbound {
+  border-color: var(--warning);
+}
+
+.module-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 16px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.module-stock .module-header {
+  background: rgba(0, 210, 255, 0.1);
+}
+
+.module-outbound .module-header {
+  background: rgba(255, 171, 0, 0.1);
+}
+
+.module-header:active {
+  opacity: 0.8;
+}
+
+.module-icon {
+  font-size: 28px;
+  width: 40px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.module-info {
+  flex: 1;
+}
+
+.module-title {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.module-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.module-arrow {
+  font-size: 22px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.module-body {
+  padding: 16px 16px 16px;
+}
+
+.module-body .btn + .btn {
+  margin-top: 10px;
+}
+
+/* 盘点会话列表限高，防挤压出库模块 */
+.module-body .session-list-scroll {
+  max-height: 160px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.module-body .session-list-scroll .session-card {
+  margin-bottom: 6px;
+}
+
+/* ========== Outbound Theme ========== */
+.btn-outbound {
+  background: var(--warning);
+  color: #000;
+  font-weight: 500;
+}
+
+.btn-outbound:hover {
+  background: #e69a00;
+}
+
+.outbound-header {
+  background: #2e1a00 !important;
+  border-bottom-color: var(--warning) !important;
+}
+
+/* ========== Status Badge ========== */
+.status-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  vertical-align: middle;
+}
+
+.status-stocked {
+  background: rgba(0, 200, 83, 0.2);
+  color: var(--success);
+}
+
+.status-outbound {
+  background: rgba(255, 171, 0, 0.2);
+  color: var(--warning);
+}
+
+.status-returned {
+  background: rgba(0, 210, 255, 0.2);
+  color: var(--accent);
+}
+
+/* ========== Outbound Confirm Card ========== */
+.outbound-card {
+  background: rgba(255, 171, 0, 0.08);
+  border: 1px solid var(--warning);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.outbound-card .outbound-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--warning);
+  margin-bottom: 10px;
+}
+
+.outbound-card .outbound-field {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  font-size: 14px;
+}
+
+.outbound-card .outbound-label {
+  color: var(--text-secondary);
+}
+
+.outbound-card .outbound-value {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+/* ========== Outbound Record Card ========== */
+.outbound-record-card {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  border-left: 3px solid var(--warning);
+}
+
+.outbound-record-card .outbound-record-title {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.outbound-record-card .outbound-record-sub {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 3px;
+}
+
+.outbound-record-card .outbound-record-time {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}

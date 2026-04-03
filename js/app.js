@@ -1,12 +1,22 @@
 'use strict';
 
+/* ===== Status Helpers ===== */
+const STATUS_LABELS = { stocked: '已盘点', outbound: '已出库', returned: '已回库' };
+const STATUS_CLASSES = { stocked: 'status-stocked', outbound: 'status-outbound', returned: 'status-returned' };
+
+function statusBadge(record) {
+  const s = record.status || 'stocked';
+  return '<span class="status-badge ' + STATUS_CLASSES[s] + '">' + STATUS_LABELS[s] + '</span>';
+}
+
 /* ===== App State ===== */
 const App = {
-  VERSION: '20260403-02',
+  VERSION: '20260403-09',
   currentSessionId: null,
   currentPage: 'home',
   pendingScanData: null,
   editingRecordId: null,
+  _pendingOutboundRecord: null,
 
   /* ===== Page Navigation ===== */
   showPage(pageId) {
@@ -29,13 +39,15 @@ const App = {
   async refreshSessionList() {
     const sessions = await DB.getAllSessions();
     const container = document.getElementById('session-list');
+    const desc = document.getElementById('stock-module-desc');
+    desc.textContent = sessions.length + ' 个盘点会话';
 
     if (sessions.length === 0) {
-      container.innerHTML = '<div class="empty-state"><div class="empty-icon">&#128203;</div><p>暂无盘点会话<br>点击下方按钮创建新盘点</p></div>';
+      container.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:16px;font-size:13px;">暂无盘点会话</div>';
       return;
     }
 
-    container.innerHTML = sessions.map((s) => {
+    const listHtml = sessions.map((s) => {
       const name = Utils.esc(s.name);
       const date = Utils.formatDate(s.createdAt);
       return '<div class="session-card" data-id="' + s.id + '">' +
@@ -49,6 +61,8 @@ const App = {
         '</div>' +
       '</div>';
     }).join('');
+
+    container.innerHTML = '<div class="session-list-scroll">' + listHtml + '</div>';
 
     container.querySelectorAll('.session-card').forEach((card) => {
       card.addEventListener('click', (e) => {
@@ -93,7 +107,7 @@ const App = {
       return '<div class="record-card" data-id="' + r.id + '">' +
         '<div class="record-index">' + (i + 1) + '</div>' +
         '<div class="record-body">' +
-          '<div class="record-title">' + Utils.esc(r.palletNumber) + '</div>' +
+          '<div class="record-title">' + Utils.esc(r.palletNumber) + ' ' + statusBadge(r) + '</div>' +
           '<div class="record-subtitle">' +
             '零件: ' + Utils.esc(r.partNumber) + ' &nbsp;|&nbsp; 批次: ' + Utils.esc(r.batchNumber) +
           '</div>' +
@@ -160,7 +174,6 @@ const App = {
   },
 
   async _showScanForm(parsed) {
-    // 检查全局是否已有相同托盘号
     const existing = await this._checkDuplicate(parsed.palletNumber);
     if (existing) {
       this._pendingDuplicate = parsed;
@@ -172,9 +185,10 @@ const App = {
         sessionHint = '（会话: ' + (session ? session.name : existing.sessionId) + '）';
       }
       document.getElementById('duplicate-message').textContent =
-        '托盘号「' + parsed.palletNumber + '」已有盘点记录' + sessionHint +
+        '托盘号「' + parsed.palletNumber + '」已有记录' + sessionHint +
         '（零件: ' + existing.partNumber +
         '，实际数量: ' + (existing.actualQuantity != null ? existing.actualQuantity : '—') +
+        '，状态: ' + STATUS_LABELS[existing.status || 'stocked'] +
         '），请选择操作：';
       document.getElementById('modal-duplicate').classList.add('active');
       return;
@@ -184,7 +198,6 @@ const App = {
   },
 
   _renderScanForm(parsed) {
-    // 收起摄像头区域，腾出表单空间
     var scannerContainer = document.getElementById('scanner-container');
     if (scannerContainer) scannerContainer.classList.add('collapsed');
 
@@ -211,7 +224,6 @@ const App = {
     });
     var shelfInput = document.getElementById('scan-shelf');
     shelfInput.focus();
-    // iOS 键盘弹出后确保输入框可见
     setTimeout(function() { shelfInput.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 300);
   },
 
@@ -224,6 +236,12 @@ const App = {
 
     const actualQuantity = Utils.parsePositiveInt(actualQtyStr);
 
+    // 判断新状态：如果原记录为已出库，则更新为已回库
+    let newStatus = 'stocked';
+    if (this._existingDuplicateRecord && (this._existingDuplicateRecord.status || 'stocked') === 'outbound') {
+      newStatus = 'returned';
+    }
+
     const record = {
       id: Utils.generateId(),
       sessionId: this.currentSessionId,
@@ -235,11 +253,11 @@ const App = {
       actualQuantity,
       invoiceNumber,
       notes,
+      status: newStatus,
       scannedAt: Utils.nowISO()
     };
 
     try {
-      // 如果是覆盖模式，先删除旧记录
       if (this._existingDuplicateRecord) {
         await DB.deleteRecord(this._existingDuplicateRecord.id);
         this._existingDuplicateRecord = null;
@@ -247,7 +265,7 @@ const App = {
       await DB.createRecord(record);
       this.pendingScanData = null;
       document.getElementById('scan-result-area').innerHTML = '';
-      this.showToast('保存成功');
+      this.showToast(newStatus === 'returned' ? '已回库盘点保存成功' : '保存成功');
       await this._renderRecentScans();
       await Scanner.start('scanner-container', (p) => {
         this.pendingScanData = p;
@@ -281,9 +299,8 @@ const App = {
       recent.map((r) =>
         '<div class="record-card">' +
           '<div class="record-body">' +
-            '<div class="record-title">' + Utils.esc(r.palletNumber) + '</div>' +
+            '<div class="record-title">' + Utils.esc(r.palletNumber) + ' ' + statusBadge(r) + '</div>' +
             '<div class="record-subtitle">' + Utils.esc(r.partNumber) + ' &nbsp;|&nbsp; 货架: ' + Utils.esc(r.shelfNumber || '—') + ' &nbsp;|&nbsp; 实际: ' + (r.actualQuantity != null ? r.actualQuantity : '—') +
-              (r.invoiceNumber ? ' &nbsp;|&nbsp; 发票: ' + Utils.esc(r.invoiceNumber) : '') +
             '</div>' +
           '</div>' +
         '</div>'
@@ -363,13 +380,9 @@ const App = {
 
     const existing = await this._checkDuplicate(palletNumber);
     if (existing) {
-      const sameSession = existing.sessionId === this.currentSessionId;
-      let sessionHint = '';
-      if (!sameSession) {
-        const session = await DB.getSession(existing.sessionId);
-        sessionHint = '（会话: ' + (session ? session.name : existing.sessionId) + '）';
-      }
-      this.showToast('托盘号「' + palletNumber + '」已存在' + sessionHint + '，请修改后重试', true);
+      const session = await DB.getSession(existing.sessionId);
+      const sessionName = session ? session.name : existing.sessionId;
+      this.showToast('托盘号「' + palletNumber + '」已存在（会话: ' + sessionName + '）', true);
       return;
     }
 
@@ -387,6 +400,7 @@ const App = {
       actualQuantity: actualQuantity,
       invoiceNumber: invoiceNumber,
       notes: notes,
+      status: 'stocked',
       scannedAt: Utils.nowISO()
     };
 
@@ -407,7 +421,8 @@ const App = {
     if (!record) return;
     this.editingRecordId = recordId;
 
-    document.getElementById('edit-scan-info').innerHTML = this._buildScanInfoHtml(record);
+    document.getElementById('edit-scan-info').innerHTML = this._buildScanInfoHtml(record) +
+      '<div style="margin-top:8px;">' + statusBadge(record) + '</div>';
 
     document.getElementById('edit-pallet').value = record.palletNumber || '';
     document.getElementById('edit-part').value = record.partNumber || '';
@@ -437,7 +452,6 @@ const App = {
       return;
     }
 
-    // 托盘号变更时检查重复
     if (palletNumber !== record.palletNumber) {
       const existing = await this._checkDuplicate(palletNumber);
       if (existing) {
@@ -450,6 +464,10 @@ const App = {
 
     const actualQuantity = Utils.parsePositiveInt(actualQtyStr);
 
+    // 保持原状态，如果是已出库则更新为已回库
+    const prevStatus = record.status || 'stocked';
+    const newStatus = prevStatus === 'outbound' ? 'returned' : prevStatus;
+
     const updated = Object.assign({}, record, {
       palletNumber,
       partNumber,
@@ -457,14 +475,143 @@ const App = {
       actualQuantity,
       batchNumber,
       invoiceNumber,
-      notes
+      notes,
+      status: newStatus
     });
 
     await DB.updateRecord(updated);
     this.editingRecordId = null;
-    this.showToast('保存成功');
+    this.showToast(newStatus !== prevStatus ? '已更新为「已回库」' : '保存成功');
     await this.refreshRecordList();
     this.showPage('page-session');
+  },
+
+  /* ===== Outbound Scanner ===== */
+  async openOutboundScanner() {
+    this.showPage('page-outbound-scanner');
+    this._pendingOutboundRecord = null;
+    document.getElementById('outbound-result-area').innerHTML = '';
+    await Scanner.start('outbound-scanner-container', (parsed) => {
+      this._showOutboundConfirm(parsed);
+    });
+  },
+
+  async _showOutboundConfirm(parsed) {
+    const record = await DB.findRecordByPallet(parsed.palletNumber);
+    const area = document.getElementById('outbound-result-area');
+
+    if (!record) {
+      area.innerHTML =
+        '<div class="outbound-card">' +
+          '<div class="outbound-title" style="color:var(--danger);">未找到记录</div>' +
+          '<div class="outbound-field"><span class="outbound-label">托盘号</span><span class="outbound-value">' + Utils.esc(parsed.palletNumber) + '</span></div>' +
+          '<p style="color:var(--text-secondary);font-size:13px;margin-top:8px;">该托盘号没有盘点记录，无法出库。</p>' +
+          '<button class="btn btn-secondary btn-block" id="btn-outbound-continue" style="margin-top:12px;">继续扫码</button>' +
+        '</div>';
+      document.getElementById('btn-outbound-continue').addEventListener('click', () => {
+        area.innerHTML = '';
+        Scanner.start('outbound-scanner-container', (p) => this._showOutboundConfirm(p));
+      });
+      return;
+    }
+
+    const currentStatus = record.status || 'stocked';
+    if (currentStatus === 'outbound') {
+      area.innerHTML =
+        '<div class="outbound-card">' +
+          '<div class="outbound-title" style="color:var(--warning);">已出库</div>' +
+          '<div class="outbound-field"><span class="outbound-label">托盘号</span><span class="outbound-value">' + Utils.esc(record.palletNumber) + '</span></div>' +
+          '<p style="color:var(--text-secondary);font-size:13px;margin-top:8px;">该托盘号已于 ' + Utils.formatDate(record._outboundAt || record.scannedAt) + ' 出库。</p>' +
+          '<button class="btn btn-secondary btn-block" id="btn-outbound-continue" style="margin-top:12px;">继续扫码</button>' +
+        '</div>';
+      document.getElementById('btn-outbound-continue').addEventListener('click', () => {
+        area.innerHTML = '';
+        Scanner.start('outbound-scanner-container', (p) => this._showOutboundConfirm(p));
+      });
+      return;
+    }
+
+    this._pendingOutboundRecord = record;
+
+    area.innerHTML =
+      '<div class="outbound-card">' +
+        '<div class="outbound-title">&#128666; 确认出库</div>' +
+        '<div class="outbound-field"><span class="outbound-label">托盘号</span><span class="outbound-value">' + Utils.esc(record.palletNumber) + '</span></div>' +
+        '<div class="outbound-field"><span class="outbound-label">零件号</span><span class="outbound-value">' + Utils.esc(record.partNumber) + '</span></div>' +
+        '<div class="outbound-field"><span class="outbound-label">批次号</span><span class="outbound-value">' + Utils.esc(record.batchNumber) + '</span></div>' +
+        '<div class="outbound-field"><span class="outbound-label">实际数量</span><span class="outbound-value">' + (record.actualQuantity != null ? record.actualQuantity : '—') + '</span></div>' +
+        '<div class="outbound-field"><span class="outbound-label">货架号</span><span class="outbound-value">' + Utils.esc(record.shelfNumber || '—') + '</span></div>' +
+        '<div class="outbound-field"><span class="outbound-label">当前状态</span><span class="outbound-value">' + statusBadge(record) + '</span></div>' +
+      '</div>' +
+      '<button class="btn btn-outbound btn-block" id="btn-do-outbound">&#10004; 确认出库</button>' +
+      '<button class="btn btn-secondary btn-block" id="btn-outbound-cancel" style="margin-top:8px;">取消</button>';
+
+    document.getElementById('btn-do-outbound').addEventListener('click', () => {
+      this._confirmOutbound();
+    });
+    document.getElementById('btn-outbound-cancel').addEventListener('click', () => {
+      area.innerHTML = '';
+      this._pendingOutboundRecord = null;
+      Scanner.start('outbound-scanner-container', (p) => this._showOutboundConfirm(p));
+    });
+  },
+
+  async _confirmOutbound() {
+    const record = this._pendingOutboundRecord;
+    if (!record) return;
+
+    const now = Utils.nowISO();
+
+    // 更新记录状态
+    const updated = Object.assign({}, record, {
+      status: 'outbound',
+      _outboundAt: now
+    });
+    await DB.updateRecord(updated);
+
+    // 创建出库记录
+    const outbound = {
+      id: Utils.generateId(),
+      recordId: record.id,
+      palletNumber: record.palletNumber,
+      partNumber: record.partNumber,
+      batchNumber: record.batchNumber,
+      quantity: record.actualQuantity,
+      outboundAt: now
+    };
+    await DB.createOutbound(outbound);
+
+    this._pendingOutboundRecord = null;
+    document.getElementById('outbound-result-area').innerHTML = '';
+    this.showToast('出库成功');
+    Scanner.start('outbound-scanner-container', (p) => this._showOutboundConfirm(p));
+  },
+
+  /* ===== Outbound List ===== */
+  async openOutboundList() {
+    this.showPage('page-outbound-list');
+    await this.refreshOutboundList();
+  },
+
+  async refreshOutboundList() {
+    const outbounds = await DB.getAllOutbounds();
+    const container = document.getElementById('outbound-list');
+
+    if (outbounds.length === 0) {
+      container.innerHTML = '<div class="empty-state"><div class="empty-icon">&#128666;</div><p>暂无出库记录</p></div>';
+      return;
+    }
+
+    container.innerHTML = outbounds.map((o) =>
+      '<div class="outbound-record-card">' +
+        '<div class="outbound-record-title">' + Utils.esc(o.palletNumber) + '</div>' +
+        '<div class="outbound-record-sub">' +
+          '零件: ' + Utils.esc(o.partNumber) + ' &nbsp;|&nbsp; 批次: ' + Utils.esc(o.batchNumber) +
+          ' &nbsp;|&nbsp; 数量: ' + (o.quantity != null ? o.quantity : '—') +
+        '</div>' +
+        '<div class="outbound-record-time">' + Utils.formatDate(o.outboundAt) + '</div>' +
+      '</div>'
+    ).join('');
   },
 
   /* ===== Delete Confirmations ===== */
@@ -545,20 +692,31 @@ const App = {
     await this._doExport(allRecords, '全部盘点_' + timestamp + '.xlsx');
   },
 
+  async _exportOutbounds() {
+    const outbounds = await DB.getAllOutbounds();
+    if (outbounds.length === 0) {
+      this.showToast('没有可导出的出库记录', true);
+      return;
+    }
+    try {
+      ExportUtils.toExcelOutbound(outbounds);
+      this.showToast('导出成功');
+    } catch (err) {
+      this.showToast('导出失败', true);
+    }
+  },
+
   /* ===== SW Update ===== */
   _registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
 
-    // 刷新后检查是否刚完成更新
     if (sessionStorage.getItem('sw-updated') === 'true') {
       sessionStorage.removeItem('sw-updated');
       setTimeout(() => this.showToast('应用已更新'), 500);
     }
 
     navigator.serviceWorker.register('sw.js').then((reg) => {
-      // 主动检查更新（避免浏览器缓存 SW 不检查）
       reg.update();
-
       reg.addEventListener('updatefound', () => {
         const newWorker = reg.installing;
         newWorker.addEventListener('statechange', () => {
@@ -569,7 +727,6 @@ const App = {
       });
     }).catch(() => {});
 
-    // 新 SW 接管后标记并刷新
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       sessionStorage.setItem('sw-updated', 'true');
       window.location.reload();
@@ -603,7 +760,6 @@ const App = {
 
   /* ===== Init ===== */
   async init() {
-    // 注入页脚版本号
     document.getElementById('footer-version').textContent = 'v' + this.VERSION;
     await DB.open();
     this._registerServiceWorker();
@@ -620,7 +776,6 @@ const App = {
       setTimeout(() => document.getElementById('input-session-name').focus(), 50);
     });
 
-    // 创建会话
     document.getElementById('btn-create-session').addEventListener('click', async () => {
       const name = document.getElementById('input-session-name').value.trim();
       if (!name) {
@@ -634,9 +789,40 @@ const App = {
       this.openScanner();
     });
 
-    // 取消新建
     document.getElementById('btn-cancel-session').addEventListener('click', () => {
       document.getElementById('modal-new-session').classList.remove('active');
+    });
+
+    // 首页 → 盘点模块（展开/收起）
+    document.getElementById('btn-open-stock').addEventListener('click', () => {
+      const body = document.getElementById('stock-module-body');
+      const arrow = document.querySelector('#stock-module .module-arrow');
+      if (body.style.display === 'none') {
+        body.style.display = 'block';
+        arrow.textContent = '▾';
+      } else {
+        body.style.display = 'none';
+        arrow.textContent = '›';
+      }
+    });
+
+    // 首页 → 出库模块（展开/收起）
+    document.getElementById('btn-open-outbound-scanner').addEventListener('click', () => {
+      const body = document.getElementById('outbound-module-body');
+      const arrow = document.querySelector('#outbound-module .module-arrow');
+      if (body.style.display === 'none') {
+        body.style.display = 'block';
+        arrow.textContent = '▾';
+      } else {
+        body.style.display = 'none';
+        arrow.textContent = '›';
+      }
+    });
+    document.getElementById('btn-outbound-scan').addEventListener('click', () => {
+      this.openOutboundScanner();
+    });
+    document.getElementById('btn-outbound-list').addEventListener('click', () => {
+      this.openOutboundList();
     });
 
     // 返回首页
@@ -659,6 +845,17 @@ const App = {
       this.refreshRecordList();
     });
 
+    // 返回首页（从出库扫码）
+    document.getElementById('btn-back-from-outbound').addEventListener('click', () => {
+      Scanner.stop();
+      this.showPage('page-home');
+    });
+
+    // 返回首页（从出库列表）
+    document.getElementById('btn-back-from-outbound-list').addEventListener('click', () => {
+      this.showPage('page-home');
+    });
+
     // 编辑表单提交
     document.getElementById('edit-form').addEventListener('submit', (e) => {
       e.preventDefault();
@@ -673,42 +870,44 @@ const App = {
       this._executeDelete();
     });
 
-    // 导出当前会话
+    // 出库确认弹窗
+    document.getElementById('btn-cancel-outbound').addEventListener('click', () => {
+      document.getElementById('modal-confirm-outbound').classList.remove('active');
+    });
+
+    // 导出
     document.getElementById('btn-export-session').addEventListener('click', () => {
       this._exportCurrentSession();
     });
-
-    // 导出全部
     document.getElementById('btn-export-all').addEventListener('click', () => {
       this._exportAll();
+    });
+    document.getElementById('btn-export-outbound').addEventListener('click', () => {
+      this._exportOutbounds();
     });
 
     // 会话详情页的扫码按钮
     document.getElementById('btn-start-scan').addEventListener('click', () => {
       this.openScanner();
     });
-
-    // 手动录入按钮
     document.getElementById('btn-manual-entry').addEventListener('click', () => {
       this._openManualEntry();
     });
 
-    // 点击模态框背景关闭
+    // 模态框背景关闭
     document.querySelectorAll('.modal-overlay').forEach((overlay) => {
       overlay.addEventListener('click', (e) => {
         if (e.target === overlay) overlay.classList.remove('active');
       });
     });
 
-    // 重复扫码 - 覆盖已有记录
+    // 重复扫码
     document.getElementById('btn-dup-overwrite').addEventListener('click', () => {
       document.getElementById('modal-duplicate').classList.remove('active');
       const parsed = this._pendingDuplicate;
       this._pendingDuplicate = null;
       this._renderScanForm(parsed);
     });
-
-    // 重复扫码 - 新建记录
     document.getElementById('btn-dup-new').addEventListener('click', () => {
       document.getElementById('modal-duplicate').classList.remove('active');
       const parsed = this._pendingDuplicate;
@@ -716,8 +915,6 @@ const App = {
       this._existingDuplicateRecord = null;
       this._renderScanForm(parsed);
     });
-
-    // 重复扫码 - 取消
     document.getElementById('btn-dup-cancel').addEventListener('click', () => {
       document.getElementById('modal-duplicate').classList.remove('active');
       this._pendingDuplicate = null;
@@ -729,7 +926,6 @@ const App = {
       });
     });
 
-    // 页面离开前停止扫描
     window.addEventListener('beforeunload', () => Scanner.stop());
   }
 };

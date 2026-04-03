@@ -2,7 +2,7 @@
 
 const DB = {
   DB_NAME: 'InventoryDB',
-  DB_VERSION: 1,
+  DB_VERSION: 2,
 
   _db: null,
 
@@ -23,6 +23,12 @@ const DB = {
           const recordStore = db.createObjectStore('records', { keyPath: 'id' });
           recordStore.createIndex('sessionId', 'sessionId');
           recordStore.createIndex('scannedAt', 'scannedAt');
+        }
+
+        if (!db.objectStoreNames.contains('outbounds')) {
+          const outboundStore = db.createObjectStore('outbounds', { keyPath: 'id' });
+          outboundStore.createIndex('outboundAt', 'outboundAt');
+          outboundStore.createIndex('palletNumber', 'palletNumber');
         }
       };
 
@@ -222,6 +228,45 @@ const DB = {
         }
       };
 
+      tx.oncomplete = () => resolve();
+      tx.onerror = (e) => reject(e.target.error);
+    });
+  },
+
+  // ===== Outbound CRUD =====
+
+  async createOutbound(outbound) {
+    await this.open();
+    return new Promise((resolve, reject) => {
+      const tx = this._db.transaction('outbounds', 'readwrite');
+      const store = tx.objectStore('outbounds');
+      store.add(outbound);
+      tx.oncomplete = () => resolve(outbound);
+      tx.onerror = (e) => reject(e.target.error);
+    });
+  },
+
+  async getAllOutbounds() {
+    await this.open();
+    return new Promise((resolve, reject) => {
+      const tx = this._db.transaction('outbounds');
+      const store = tx.objectStore('outbounds');
+      const request = store.getAll();
+      request.onsuccess = () => {
+        const items = request.result;
+        items.sort((a, b) => b.outboundAt.localeCompare(a.outboundAt));
+        resolve(items);
+      };
+      tx.onerror = (e) => reject(e.target.error);
+    });
+  },
+
+  async deleteOutbound(id) {
+    await this.open();
+    return new Promise((resolve, reject) => {
+      const tx = this._db.transaction('outbounds', 'readwrite');
+      const store = tx.objectStore('outbounds');
+      store.delete(id);
       tx.oncomplete = () => resolve();
       tx.onerror = (e) => reject(e.target.error);
     });

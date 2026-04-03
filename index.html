@@ -16,16 +16,50 @@
     <!-- ====== Page: Home ====== -->
     <div id="page-home" class="page active">
       <div class="header">
-        <h1>库存盘点</h1>
+        <h1>库存管理</h1>
         <div class="header-actions">
           <button class="btn btn-sm btn-secondary" id="btn-refresh" title="刷新页面" onclick="App._doRefresh()">&#128260; 刷新</button>
           <button class="btn btn-sm btn-secondary" id="btn-export-all" title="导出全部">&#128196; 导出</button>
         </div>
       </div>
-      <div id="session-list" style="margin-top:8px;"></div>
-      <button class="btn btn-primary btn-block" id="btn-new-session" style="margin-top:12px;">
-        + 新建盘点
-      </button>
+
+      <!-- 盘点模块 -->
+      <div class="module-card module-stock" id="stock-module">
+        <div class="module-header" id="btn-open-stock">
+          <div class="module-icon">&#128230;</div>
+          <div class="module-info">
+            <div class="module-title">盘点管理</div>
+            <div class="module-desc" id="stock-module-desc">扫码盘点库存数据</div>
+          </div>
+          <div class="module-arrow">&#8250;</div>
+        </div>
+        <div class="module-body" id="stock-module-body">
+          <div id="session-list"></div>
+          <button class="btn btn-primary btn-block" id="btn-new-session" style="margin-top:8px;">
+            + 新建盘点
+          </button>
+        </div>
+      </div>
+
+      <!-- 出库模块 -->
+      <div class="module-card module-outbound" id="outbound-module">
+        <div class="module-header" id="btn-open-outbound-scanner">
+          <div class="module-icon">&#128666;</div>
+          <div class="module-info">
+            <div class="module-title">出库管理</div>
+            <div class="module-desc">扫码确认出库</div>
+          </div>
+          <div class="module-arrow">&#8250;</div>
+        </div>
+        <div class="module-body" id="outbound-module-body">
+          <button class="btn btn-outbound btn-block" id="btn-outbound-scan">
+            &#128247; 扫码出库
+          </button>
+          <button class="btn btn-secondary btn-block" id="btn-outbound-list">
+            &#128203; 出库记录
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- ====== Page: Session Detail ====== -->
@@ -105,6 +139,26 @@
       </form>
     </div>
 
+    <!-- ====== Page: Outbound Scanner ====== -->
+    <div id="page-outbound-scanner" class="page">
+      <div class="header outbound-header">
+        <button class="btn-back" id="btn-back-from-outbound">&#8592;</button>
+        <h1>扫码出库</h1>
+      </div>
+      <div id="outbound-scanner-container"></div>
+      <div id="outbound-result-area"></div>
+    </div>
+
+    <!-- ====== Page: Outbound List ====== -->
+    <div id="page-outbound-list" class="page">
+      <div class="header outbound-header">
+        <button class="btn-back" id="btn-back-from-outbound-list">&#8592;</button>
+        <h1>出库记录</h1>
+        <button class="btn btn-sm btn-outbound" id="btn-export-outbound">&#128196; 导出</button>
+      </div>
+      <div id="outbound-list"></div>
+    </div>
+
   </div>
 
   <!-- ====== Modal: New Session ====== -->
@@ -143,6 +197,18 @@
       <div class="modal-actions">
         <button class="btn btn-secondary" id="btn-cancel-delete">取消</button>
         <button class="btn btn-danger" id="btn-confirm-delete">删除</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== Modal: Confirm Outbound ====== -->
+  <div class="modal-overlay" id="modal-confirm-outbound">
+    <div class="modal">
+      <h3 style="color:var(--warning);">确认出库</h3>
+      <p id="outbound-confirm-message" style="color:var(--text-secondary);font-size:14px;"></p>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="btn-cancel-outbound">取消</button>
+        <button class="btn btn-outbound" id="btn-confirm-outbound">确认出库</button>
       </div>
     </div>
   </div>
